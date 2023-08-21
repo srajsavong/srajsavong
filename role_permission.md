@@ -69,13 +69,12 @@ In the scope object we'll add the key `actions` which contains an object of acti
 - save
 - delete
 - create
-- "*": this wildcard action define all actions allowed on this scope
-Each action key is set to `true`. If not, the action is simply denied.
+- "*": this wildcard action define all actions allowed on a scope
+Each action key is set to `true`. If not, or unset, the action is simply denied.
+
+> locations restricted: In some case, you want to restrict actions for one or some locations. The value of the action is now an array of ids of location.
 
 We could add special actions like `send-email` or `export` as actions or as nested actions if we need to go deeper in a component
-
-> locations restricted: In some case, you want to restrict actions from a scope for one or some locations. The value of the action is now an array of ids of location.
-
 
 ```json
   {
@@ -188,15 +187,15 @@ flowchart TD
     A{key <b>scope</b> EXIST in <br/> <b>subject</b> ?} -->|fa:fa-check YES| AL(actions LIST)
       AL --> AV{action VALUE}
         AV -->|true| G[fa:fa-check GRANTED]
-        AV -->|Array| F{!for?}
+        AV -->|Array| F{has <b>for</b> ?}
           F --> |fa:fa-check YES| LF{<b>location_id</b> is <br /> in <b>for</b> param ?}
             LF -->|fa:fa-check YES| G[fa:fa-check GRANTED]
             LF -->|NO| LR[fa:fa-ban RESTRICTED_LOCATIONS]
           F --> |NO| LR[fa:fa-ban RESTRICTED_LOCATIONS]
     A{key <b>scope</b> EXIST in <br/> <b>subject</b> ?} -->|NO| RL[resources LIST <br/> for each other scope ]
       RL --> RV{resource EXIST}
-        RV -->|NO| D[fa:fa-ban DENIED]
         RV -->|YES| RR(recall function can with: <br/> subject: <b>resources</b>, <br/> action: <b>action</b>, <br/> scope: <b>scope</b>, ) -->S
+        RV -->|NO| D[fa:fa-ban DENIED]
 
   S{has <b>subject</b> ? <br/>AND <br/> has <b>action</b> ? <br/>AND <br/> has <b>scope</b> ?} --> |NO| D[fa:fa-ban DENIED]
 
@@ -217,39 +216,42 @@ function can(
 ): | { status: "GRANTED" } 
    | { status: "DENIED", reason: String }
    | { status: "RESTRICTED_LOCATION", allowedLocation: String[], reason: String } {
-    // check params
+    // check params: has subject AND action AND scope ?
     if (!subject) return { status: "DENIED", reason: "subject missing" }
     if (!action) return { status: "DENIED", reason: "action missing" }
     if (!scope) return { status: "DENIED", reason: "scope missing" }
     
-    // which scope is concerned ?
+    // key scope EXIST in subject ?
     const currentScope = subject[scope];
     if (!currentScope) {
       // search in resource of each other domain
-      const otherScopeResourcePermission = Object.keys(subject)
-      .map(key => can(subject[key].resources, action, scope))
-      .filter(p => p.status === 'GRANTED');
-      // at least one resource match scope and action
-      if (otherScopeResourcePermission) return otherScopeResourcePermission;
+      const otherScopeResourcePermission = Object.keys(subject).reduce((prev, key) => {
+        if (!subject[key].resources) return prev;
+        // at least one resource match scope and action
+        return can(subject[key].resources, action, scope, locations);
+      }, { status: "DENIED", reason: "action or scope doesn't match permissions" })
       
-      return { status: "DENIED", reason: "action or scope doesn't match permissions" }
+      return otherScopeResourcePermission;
     }
+
+    // actions LIST
     const actions = currentScope?.actions;
     // no actions found in this scope
     if (!actions) return { status: "DENIED", reason: "actions not found for scope ${scope}" }
-
-    if (actions['*']) return { status: "GRANTED" } // wildcard
-
+    // wildcard: all actions granted
+    if (actions['*']) return { status: "GRANTED" }
+    // action VALUE
     const requestedAction = actions(action);
-    if (Array.isArray(requestedAction)) { // action is filtered by location
-      // check param for
+    // action is filtered by location
+    if (Array.isArray(requestedAction)) {
+      // has for ?
       if (!for) return { status: "RESTRICTED_LOCATION", reason: "locations filter missing" }
-      // action filter contains at least one item in param for ?
+      // location_id (from action) is in for param ?
       const hasLocation = requestedAction.some(r=> for.indexOf(r) > -1)
       if (!hasLocation) return { status: "RESTRICTED_LOCATION", reason: "locations not allowed" }
     }
 
-    if (!requestedAction) return { status: "DENIED", reason: "action [${action}] in scope [${scope}] is forbidden" }
+    if (!requestedAction) return { status: "DENIED", reason: `action [${action}] in scope [${scope}] is forbidden` }
 
     return { status: "GRANTED" } 
 }
@@ -313,7 +315,7 @@ const canEditStats = can(permissions, 'read', 'CATALOG')
 console.log(canEditStats)
 // { status: 'GRANTED' }
 
-const canSaveProduct = can(permissions, 'read', 'PRODUCTS')
+const canSaveProduct = can(permissions, 'save', 'PRODUCTS')
 console.log(canSaveProduct)
 // { status: 'GRANTED' }
 
