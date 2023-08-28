@@ -24,8 +24,7 @@ sequenceDiagram
 ```
 
 Web App / API Service
-: Every user from a web app or an API service that need to access to a resource require an authentication
-is calling the `Authentication service`.
+: Every user from a web app or an API service that need to access to a resource require to be authenticated by calling the `Authentication service`.
 
 
 Authentication Service
@@ -250,7 +249,7 @@ function can(
       const hasLocation = requestedAction.some(r=> for.indexOf(r) > -1)
       if (!hasLocation) return { status: "RESTRICTED_LOCATION", reason: "locations not allowed" }
     }
-
+    // case action is set to false
     if (!requestedAction) return { status: "DENIED", reason: `action [${action}] in scope [${scope}] is forbidden` }
 
     return { status: "GRANTED" } 
@@ -338,7 +337,7 @@ const canEditUsers = can(permissions, 'edit', 'USERS')
 ```
 
 
-#### Compiles permissions
+#### [DRAFT] Compiles permissions
 
 ```ts
 
@@ -372,13 +371,13 @@ const compilePermissions = (data, separator = ' ', parentScope) => {
     const rules = compileRules(actions, compiledScope, separator);
 
     prev = prev.concat(rules.reduce((p, r) => {
-        if (typeof r === 'string') {
-            p.push(r)
-        }
-        else {
-            p = p.concat(r)
-        }
-        return p
+      if (typeof r === 'string') {
+        p.push(r)
+      }
+      else {
+        p = p.concat(r)
+      }
+      return p
     }, []));
 
     if (resources) {
