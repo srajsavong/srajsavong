@@ -73,7 +73,7 @@ Each action key is set to `true`. If not, or unset, the action is simply denied.
 
 > locations restricted: In some case, you want to restrict actions for one or some locations. The value of the action is now an array of ids of location.
 
-We could add special actions like `send-email` or `export` as actions or as nested actions if we need to go deeper in a component
+We could add special actions like `send-email` or `export` as actions
 
 ```json
   {
@@ -176,6 +176,18 @@ erDiagram
 
 The function `can` that requires as parameters the permission context, an action, a scope (or a resource) and, optionally, an array of location id, returns an object with the status `GRANTED`, `DENIED` or `RESTRICTED_LOCATION`.
 
+```TS
+function can(
+    subject: PermissionContext,
+    action: PermissionAction,
+    scope: Scope | Resource,
+    for?: Location[]
+): | { status: "GRANTED" } 
+   | { status: "DENIED", reason: String }
+   | { status: "RESTRICTED_LOCATION", allowedLocation: String[], reason: String } {
+    ...
+```
+
 #### Flowchart
 
 This flowchart describes the process of checking permissions to do an action A on a resource R based in a scope S.
@@ -202,6 +214,13 @@ flowchart TD
   style D fill:red,stroke-width:0,color:#fff
   style LR fill:red,stroke-width:0,color:#fff
 ```
+
+---
+### Pending questions
+- define correct actions: is `save` the same as `create` or `update` ?
+- manage denied actions ? eg: `update: false`
+
+
 
 #### Some coding
 
